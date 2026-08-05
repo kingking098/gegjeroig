@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>استریم زنده مرورگر</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { 
+            background: #0d0d0d; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            flex-direction: column; 
+            color: white; 
+            font-family: Arial, sans-serif;
+        }
+        #browser-container {
+            width: 90%;
+            max-width: 1280px;
+            position: relative;
+            background: #000;
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+        }
+        #browser-stream {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: crosshair;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .controls input, .controls button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+        }
+        .controls input {
+            width: 300px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+        }
+        .controls button {
+            background: #00ff88;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .controls button:hover {
+            transform: scale(1.05);
+            background: #00cc77;
+        }
+        .status {
+            margin-top: 10px;
+            color: #00ff88;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="browser-container">
+    <img id="browser-stream" alt="استریم زنده مرورگر" />
+</div>
+
+<div class="controls">
+    <input type="text" id="url-input" placeholder="آدرس را وارد کن (مثلا https://google.com)" />
+    <button onclick="navigate()">برو</button>
+    <button onclick="pressKey('Enter')">↵ Enter</button>
+    <button onclick="pressKey('Backspace')">⌫ Backspace</button>
+    <button onclick="scrollPage(-200)">↑ اسکرول بالا</button>
+    <button onclick="scrollPage(200)">↓ اسکرول پایین</button>
+</div>
+<div class="status" id="status">🟢 در حال دریافت استریم زنده...</div>
+
+<script>
+    const socket = io();
+    const img = document.getElementById('browser-stream');
+    const status = document.getElementById('status');
+
+    // شروع استریم به محض اتصال
+    socket.on('connect', () => {
+        socket.emit('start-stream');
+    });
+
+    // دریافت فریم‌های زنده
+    socket.on('live-frame', (base64Data) => {
+        img.src = 'data:image/jpeg;base64,' + base64Data;
+        status.innerText = '🟢 استریم فعال (کیفیت بالا)';
+    });
+
+    // خطاها
+    socket.on('error', (msg) => {
+        status.innerText = '🔴 خطا: ' + msg;
+    });
+
+    // --- کنترل‌ها ---
+
+    // کلیک روی تصویر (مختصات دقیق)
+    img.addEventListener('click', (e) => {
+        const rect = img.getBoundingClientRect();
+        // نسبت اندازه تصویر نمایشی با اندازه واقعی ویوپورت (1280x720)
+        const scaleX = 1280 / rect.width;
+        const scaleY = 720 / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        socket.emit('command', { type: 'click', x, y });
+        status.innerText = '✅ کلیک شد (' + Math.round(x) + ', ' + Math.round(y) + ')';
+    });
+
+    // تایپ با کیبورد (وقتی روی صفحه کلیک کنی و کیبورد بزنی)
+    document.addEventListener('keydown', (e) => {
+        // جلوگیری از ارسال کلیدهای سیستمی
+        if (e.key === 'F12' || e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt') return;
+        
+        if (e.key === 'Enter') {
+            socket.emit('command', { type: 'keydown', text: 'Enter' });
+        } else if (e.key === 'Backspace') {
+            socket.emit('command', { type: 'keydown', text: 'Backspace' });
+        } else if (e.key.length === 1) {
+            socket.emit('command', { type: 'type', text: e.key });
+        }
+        status.innerText = '⌨️ کلید زده شد: ' + e.key;
+    });
+
+    // توابع کمکی برای دکمه‌ها
+    function navigate() {
+        const url = document.getElementById('url-input').value;
+        if (url) {
+            socket.emit('command', { type: 'goto', url });
+            status.innerText = '🌐 در حال رفتن به: ' + url;
+        }
+    }
+    function pressKey(key) {
+        socket.emit('command', { type: 'keydown', text: key });
+        status.innerText = '⌨️ کلید: ' + key;
+    }
+    function scrollPage(amount) {
+        socket.emit('command', { type: 'scroll', text: amount });
+        status.innerText = '📜 اسکرول: ' + (amount > 0 ? 'پایین' : 'بالا');
+    }
+</script>
+</body>
+</html>
