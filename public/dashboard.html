@@ -1,107 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="fa">
 <head>
-    <title>استریم زنده مرورگر</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد استریم</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { 
-            background: #0d0d0d; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            margin: 0; 
-            flex-direction: column; 
-            color: white; 
-            font-family: Arial, sans-serif;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0b0e14;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
         }
-        #browser-container {
-            width: 90%;
-            max-width: 1280px;
-            position: relative;
-            background: #000;
-            border: 2px solid #00ff88;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+        .container {
+            width: 100%;
+            max-width: 1300px;
+            background: #111b26;
+            border-radius: 24px;
+            padding: 20px;
+            border: 1px solid #2a3a4a;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
         }
-        #browser-stream {
+        #browser-view {
             width: 100%;
             height: auto;
+            border-radius: 16px;
+            background: #000;
             display: block;
             cursor: crosshair;
+            border: 2px solid #00ff88;
         }
         .controls {
-            margin-top: 20px;
             display: flex;
-            gap: 10px;
             flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+            align-items: center;
             justify-content: center;
         }
-        .controls input, .controls button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            font-size: 14px;
-        }
         .controls input {
-            width: 300px;
-            background: #222;
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: none;
+            background: #0f1722;
             color: #fff;
-            border: 1px solid #444;
+            border: 1px solid #2a3a4a;
+            font-size: 15px;
+            outline: none;
+        }
+        .controls input:focus {
+            border-color: #00ff88;
         }
         .controls button {
+            padding: 12px 22px;
+            border-radius: 12px;
+            border: none;
             background: #00ff88;
-            color: #000;
-            font-weight: bold;
+            color: #0b0e14;
+            font-weight: 700;
+            font-size: 14px;
             cursor: pointer;
             transition: 0.2s;
         }
         .controls button:hover {
-            transform: scale(1.05);
-            background: #00cc77;
+            background: #00d973;
+            transform: scale(1.03);
         }
         .status {
-            margin-top: 10px;
-            color: #00ff88;
+            margin-top: 15px;
+            color: #8a9aa8;
             font-size: 14px;
+            text-align: center;
         }
+        .status .green { color: #00ff88; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="browser-container">
-    <img id="browser-stream" alt="استریم زنده مرورگر" />
-</div>
+<div class="container">
+    <img id="browser-view" alt="خروجی مرورگر" />
 
-<div class="controls">
-    <input type="text" id="url-input" placeholder="مثلا google.com" value="https://google.com" />
-    <button onclick="navigate()">برو</button>
-    <button onclick="pressKey('Enter')">↵ Enter</button>
-    <button onclick="pressKey('Backspace')">⌫ Backspace</button>
-    <button onclick="scrollPage(-200)">↑ اسکرول بالا</button>
-    <button onclick="scrollPage(200)">↓ اسکرول پایین</button>
+    <div class="controls">
+        <input type="text" id="urlInput" placeholder="آدرس (مثلا google.com)" value="https://google.com" />
+        <button onclick="goToUrl()">برو</button>
+        <button onclick="sendKey('Enter')">↵ Enter</button>
+        <button onclick="sendKey('Backspace')">⌫ Backspace</button>
+        <button onclick="scrollPage(-150)">↑ بالا</button>
+        <button onclick="scrollPage(150)">↓ پایین</button>
+    </div>
+
+    <div class="status" id="statusText">🟢 <span class="green">در حال اتصال به استریم...</span></div>
 </div>
-<div class="status" id="status">🟢 در حال دریافت استریم زنده...</div>
 
 <script>
-    const socket = io({
-        transports: ['websocket', 'polling']
-    });
-    const img = document.getElementById('browser-stream');
-    const status = document.getElementById('status');
+    const socket = io({ transports: ['websocket', 'polling'] });
+    const img = document.getElementById('browser-view');
+    const status = document.getElementById('statusText');
 
     socket.on('connect', () => {
         socket.emit('start-stream');
+        status.innerHTML = '🟢 <span class="green">استریم فعال</span>';
     });
 
-    socket.on('live-frame', (base64Data) => {
-        img.src = 'data:image/jpeg;base64,' + base64Data;
-        status.innerText = '🟢 استریم فعال (کیفیت بالا)';
+    socket.on('live-frame', (data) => {
+        img.src = 'data:image/jpeg;base64,' + data;
     });
 
     socket.on('error', (msg) => {
-        status.innerText = '🔴 خطا: ' + msg;
+        status.innerHTML = '🔴 خطا: ' + msg;
     });
 
     // کلیک روی تصویر
@@ -112,36 +126,29 @@
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         socket.emit('command', { type: 'click', x, y });
-        status.innerText = '✅ کلیک شد (' + Math.round(x) + ', ' + Math.round(y) + ')';
     });
 
     // تایپ با کیبورد
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'F12' || e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt') return;
-        
-        if (e.key === 'Enter') {
-            socket.emit('command', { type: 'keydown', text: 'Enter' });
-        } else if (e.key === 'Backspace') {
-            socket.emit('command', { type: 'keydown', text: 'Backspace' });
-        } else if (e.key.length === 1) {
-            socket.emit('command', { type: 'type', text: e.key });
-        }
-        status.innerText = '⌨️ کلید زده شد: ' + e.key;
+        if (['Control', 'Shift', 'Alt', 'Meta', 'F12'].includes(e.key)) return;
+        if (e.key === 'Enter') socket.emit('command', { type: 'keydown', text: 'Enter' });
+        else if (e.key === 'Backspace') socket.emit('command', { type: 'keydown', text: 'Backspace' });
+        else if (e.key.length === 1) socket.emit('command', { type: 'type', text: e.key });
     });
 
-    function navigate() {
-        const url = document.getElementById('url-input').value;
-        socket.emit('command', { type: 'goto', url });
-        status.innerText = '🌐 در حال رفتن به: ' + url;
+    function goToUrl() {
+        const url = document.getElementById('urlInput').value.trim();
+        if (url) socket.emit('command', { type: 'goto', url });
     }
-    function pressKey(key) {
+
+    function sendKey(key) {
         socket.emit('command', { type: 'keydown', text: key });
-        status.innerText = '⌨️ کلید: ' + key;
     }
+
     function scrollPage(amount) {
         socket.emit('command', { type: 'scroll', text: amount });
-        status.innerText = '📜 اسکرول: ' + (amount > 0 ? 'پایین' : 'بالا');
     }
 </script>
+
 </body>
 </html>
