@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');  // ← تغییر این خط
 
 const app = express();
 const server = http.createServer(app);
@@ -19,7 +19,8 @@ let clientSocket = null;
 async function startBrowser() {
     if (!browser) {
         browser = await puppeteer.launch({
-            headless: "new",  // ← نسخه جدید
+            headless: "new",
+            executablePath: '/usr/bin/chromium',  // ← اضافه کردن این خط (مسیر کروم در Railway)
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -30,11 +31,12 @@ async function startBrowser() {
             defaultViewport: { width: 1280, height: 720 }
         });
         page = await browser.newPage();
-        await page.goto('https://google.com');  // ← صفحه پیش‌فرض گوگل
+        await page.goto('https://google.com');
     }
     return page;
 }
 
+// بقیه کد دقیقاً مثل قبل (لاگین، سوکت‌ها و ...) - همان کدی که قبلاً برات فرستادم را اینجا کپی کن
 app.post('/login', express.json(), (req, res) => {
     if (req.body.username && req.body.password) {
         res.json({ success: true, redirect: '/dashboard.html' });
