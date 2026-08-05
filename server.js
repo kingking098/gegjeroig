@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const puppeteer = require('puppeteer-core');  // ← تغییر این خط
+const puppeteer = require('puppeteer-core');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,13 +14,13 @@ app.use(express.static('public'));
 
 let browser = null;
 let page = null;
-let clientSocket = null;
 
 async function startBrowser() {
     if (!browser) {
+        console.log('⏳ در حال راه‌اندازی مرورگر کروم...');
         browser = await puppeteer.launch({
             headless: "new",
-            executablePath: '/usr/bin/chromium',  // ← اضافه کردن این خط (مسیر کروم در Railway)
+            executablePath: '/usr/bin/chromium',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -32,11 +32,12 @@ async function startBrowser() {
         });
         page = await browser.newPage();
         await page.goto('https://google.com');
+        console.log('✅ مرورگر آماده است');
     }
     return page;
 }
 
-// بقیه کد دقیقاً مثل قبل (لاگین، سوکت‌ها و ...) - همان کدی که قبلاً برات فرستادم را اینجا کپی کن
+// لاگین ساختگی (هر چیزی قبول می‌شود)
 app.post('/login', express.json(), (req, res) => {
     if (req.body.username && req.body.password) {
         res.json({ success: true, redirect: '/dashboard.html' });
@@ -46,8 +47,7 @@ app.post('/login', express.json(), (req, res) => {
 });
 
 io.on('connection', async (socket) => {
-    console.log('کاربر متصل شد');
-    clientSocket = socket;
+    console.log('👤 کاربر متصل شد');
 
     socket.on('start-stream', async () => {
         try {
@@ -70,9 +70,11 @@ io.on('connection', async (socket) => {
 
             socket.on('disconnect', () => {
                 session.detach().catch(() => {});
+                console.log('👤 کاربر قطع شد');
             });
 
         } catch (err) {
+            console.error('❌ خطا در استریم:', err.message);
             socket.emit('error', err.message);
         }
     });
@@ -102,10 +104,12 @@ io.on('connection', async (socket) => {
                 await page.evaluate((scrollY) => { window.scrollBy(0, scrollY); }, text);
             }
         } catch (err) {
+            console.error('❌ خطا در دستور:', err.message);
             socket.emit('error', err.message);
         }
     });
 });
 
+// استفاده از پورت اختصاص داده شده توسط Railway
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ استریم زنده روی پورت ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`✅ استریم زنده روی پورت ${PORT}`));
