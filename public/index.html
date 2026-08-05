@@ -1,25 +1,252 @@
 <!DOCTYPE html>
-<html>
-<head><title></title></head>
-<body style="display:flex; justify-content:center; align-items:center; height:100vh; background:#111; color:#fff; flex-direction:column; font-family:sans-serif;">
-    <h2>    </h2>
-    <input id="user" placeholder="  ( )" style="padding:10px;margin:5px;border-radius:8px;border:none;width:250px;" /><br/>
-    <input id="pass" type="password" placeholder="  ( )" style="padding:10px;margin:5px;border-radius:8px;border:none;width:250px;" /><br/>
-    <button onclick="login()" style="padding:10px 30px;margin-top:10px;background:#00ff88;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px;"></button>
-    <script>
-        async function login() {
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    username: document.getElementById('user').value, 
-                    password: document.getElementById('pass').value 
-                })
-            });
-            const data = await res.json();
-            if(data.success) location.href = data.redirect;
-            else alert('   ! (   )');
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود به کنترل‌کننده مرورگر</title>
+    <style>
+        /* ریست و فونت */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #0d0d0d 0%, #1a1a2e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            direction: rtl;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 32px;
+            padding: 48px 40px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 255, 136, 0.15);
+            transition: transform 0.3s ease;
+        }
+
+        .login-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-header .icon {
+            font-size: 56px;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .login-header h1 {
+            color: #fff;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .login-header p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+            font-weight: 300;
+        }
+
+        .form-group input:focus {
+            border-color: #00ff88;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.08);
+        }
+
+        .form-group input:focus + .input-border {
+            opacity: 1;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: #00ff88;
+            border: none;
+            border-radius: 16px;
+            color: #0d0d0d;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+            font-family: inherit;
+        }
+
+        .btn-login:hover {
+            background: #00e07a;
+            transform: scale(1.02);
+            box-shadow: 0 8px 30px rgba(0, 255, 136, 0.25);
+        }
+
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 28px;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .login-footer span {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .error-message {
+            background: rgba(255, 50, 50, 0.15);
+            border: 1px solid rgba(255, 50, 50, 0.25);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #ff6b6b;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 16px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* ریسپانسیو */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 32px 20px;
+            }
+            .login-header h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="login-header">
+            <span class="icon">🚀</span>
+            <h1>کنترل‌کننده مرورگر</h1>
+            <p>برای ورود، هر نام کاربری و رمزی معتبر است</p>
+        </div>
+
+        <form id="loginForm" autocomplete="off">
+            <div class="form-group">
+                <label for="username">👤 نام کاربری</label>
+                <input type="text" id="username" placeholder="مثلاً admin" required />
+            </div>
+
+            <div class="form-group">
+                <label for="password">🔒 رمز عبور</label>
+                <input type="password" id="password" placeholder="••••••••" required />
+            </div>
+
+            <button type="submit" class="btn-login">ورود به داشبورد</button>
+
+            <div id="errorMessage" class="error-message">
+                ❌ نام کاربری یا رمز عبور اشتباه است!
+            </div>
+        </form>
+
+        <div class="login-footer">
+            <span>🚀 پروژه استریم زنده مرورگر</span>
+        </div>
+    </div>
+
+    <script>
+        // جلوگیری از ارسال فرم به روش سنتی
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const errorEl = document.getElementById('errorMessage');
+
+            // حذف پیام خطای قبلی
+            errorEl.classList.remove('show');
+
+            // اعتبارسنجی ساده
+            if (!username || !password) {
+                errorEl.textContent = '❌ لطفاً هر دو فیلد را پر کنید!';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // هدایت به داشبورد
+                    window.location.href = data.redirect;
+                } else {
+                    errorEl.textContent = '❌ نام کاربری یا رمز عبور اشتباه است!';
+                    errorEl.classList.add('show');
+                }
+            } catch (error) {
+                console.error('خطا در ارتباط با سرور:', error);
+                errorEl.textContent = '❌ خطا در ارتباط با سرور. دوباره تلاش کنید.';
+                errorEl.classList.add('show');
+            }
+        });
+
+        // امکان ورود با کلید Enter (همین الان توسط فرم پشتیبانی می‌شود)
     </script>
+
 </body>
 </html>
