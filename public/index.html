@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><title></title></head>
+<body style="display:flex; justify-content:center; align-items:center; height:100vh; background:#111; color:#fff; flex-direction:column; font-family:sans-serif;">
+    <h2>    </h2>
+    <input id="user" placeholder="  ( )" style="padding:10px;margin:5px;border-radius:8px;border:none;width:250px;" /><br/>
+    <input id="pass" type="password" placeholder="  ( )" style="padding:10px;margin:5px;border-radius:8px;border:none;width:250px;" /><br/>
+    <button onclick="login()" style="padding:10px 30px;margin-top:10px;background:#00ff88;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px;"></button>
+    <script>
+        async function login() {
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    username: document.getElementById('user').value, 
+                    password: document.getElementById('pass').value 
+                })
+            });
+            const data = await res.json();
+            if(data.success) location.href = data.redirect;
+            else alert('   ! (   )');
+        }
+    </script>
+</body>
+</html>
