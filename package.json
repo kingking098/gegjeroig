@@ -10,6 +10,7 @@
     "socket.io": "4.8.3",
     "puppeteer": "25.5.0",
     "wrtc": "^0.4.7",
-    "jpeg-js": "^0.4.4"
+    "jpeg-js": "^0.4.4",
+    "@mapbox/node-pre-gyp": "^1.0.11"
   }
 }
