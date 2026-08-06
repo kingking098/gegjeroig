@@ -95,6 +95,15 @@ socket.emit("start-webrtc");
 });
 
 
+socket.on("error",msg=>{
+
+status.innerHTML="ERROR: "+msg;
+
+console.error("Server error:",msg);
+
+});
+
+
 
 socket.on("offer",async offer=>{
 
@@ -280,6 +289,8 @@ return page;
 
 async function startCapture(){
 
+try{
+
 const session =
 await page.target().createCDPSession();
 
@@ -433,17 +444,19 @@ sessionId:frame.sessionId
 
 });
 
+}catch(e){
+
+console.error(" startCapture error:", e);
 
 }
 
-
-
+}
 
 
 io.on("connection",socket=>{
 
 
-console.log("👤 user connected");
+console.log(" user connected");
 
 
 let peer=null;
@@ -564,6 +577,8 @@ await startCapture();
 
 }catch(e){
 
+console.error(" start-webrtc error:", e);
+
 socket.emit(
 "error",
 e.message
@@ -606,6 +621,8 @@ await peer.addIceCandidate(c);
 
 socket.on("disconnect",()=>{
 
+console.log(" user disconnected");
+
 try{
 
 if(peer)
@@ -627,7 +644,7 @@ process.env.PORT || 8080;
 server.listen(PORT,"0.0.0.0",()=>{
 
 console.log(
-"🔥 WebRTC server running",
+" WebRTC server running",
 PORT
 );
 
