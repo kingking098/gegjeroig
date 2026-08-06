@@ -67,7 +67,7 @@ border-radius:15px;
 
 <body>
 
-<video id="screen" autoplay playsinline></video>
+<video id="screen" autoplay playsinline muted></video>
 
 <h3 id="status">Connecting...</h3>
 
@@ -146,7 +146,11 @@ e.track.kind
 
 video.srcObject=e.streams[0];
 
-video.play();
+video.play().catch(err=>{
+
+console.log("play error:",err.message);
+
+});
 
 };
 
