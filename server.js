@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const puppeteer = require("puppeteer");
-const wrtc = require("@roamhq/wrtc");
+const wrtc = require("wrtc");
 const jpeg = require("jpeg-js");
 
 const { RTCVideoSource } = wrtc.nonstandard;
