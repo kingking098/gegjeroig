@@ -452,7 +452,6 @@ console.error(" startCapture error:", e);
 
 }
 
-
 io.on("connection",socket=>{
 
 
@@ -515,12 +514,15 @@ const params =
 sender.getParameters();
 
 
-if(params.encodings){
+if(!params.encodings || params.encodings.length===0){
+
+params.encodings=[{}];
+
+}
+
 
 params.encodings[0].maxBitrate =
 2000000;
-
-}
 
 
 await sender.setParameters(params);
