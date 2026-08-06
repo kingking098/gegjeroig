@@ -1,421 +1,215 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const puppeteer = require("puppeteer-core");
-const path = require("path");
-const fs = require("fs");
+const express=require("express");
+const http=require("http");
+const {Server}=require("socket.io");
+const puppeteer=require("puppeteer");
+const path=require("path");
+const fs=require("fs");
 
-const app = express();
-const server = http.createServer(app);
+const app=express();
+const server=http.createServer(app);
 
-const io = new Server(server, {
-    cors: { origin: "*" },
-    transports: ["websocket", "polling"]
+const io=new Server(server,{
+ cors:{origin:"*"},
+ transports:["websocket","polling"]
 });
 
-
-const PUBLIC = path.join(__dirname, "public");
-
+const PUBLIC=path.join(__dirname,"public");
 
 console.log("🔥 SERVER STARTED");
-console.log("DIR:", __dirname);
-console.log("PUBLIC:", PUBLIC);
-
-console.log("public:", fs.existsSync(PUBLIC));
-console.log("index:", fs.existsSync(path.join(PUBLIC, "index.html")));
-console.log("dashboard:", fs.existsSync(path.join(PUBLIC, "dashboard.html")));
+console.log("PUBLIC:",PUBLIC);
+console.log("public:",fs.existsSync(PUBLIC));
 
 
 app.use(express.json());
 
 
-// تست فایل‌ها
-app.get("/check", (req,res)=>{
-    res.json({
-        public: fs.existsSync(PUBLIC),
-        index: fs.existsSync(path.join(PUBLIC,"index.html")),
-        dashboard: fs.existsSync(path.join(PUBLIC,"dashboard.html"))
-    });
+app.get("/check",(req,res)=>{
+ res.json({
+  public:fs.existsSync(PUBLIC),
+  index:fs.existsSync(path.join(PUBLIC,"index.html")),
+  dashboard:fs.existsSync(path.join(PUBLIC,"dashboard.html"))
+ });
 });
 
 
-// صفحه اصلی
-app.get("/", (req,res)=>{
-
+app.get("/",(req,res)=>{
 res.send(`
-<!DOCTYPE html>
 <html>
 <body style="background:#111;color:white;text-align:center">
 <h1>HELLO RAILWAY</h1>
 <p>Server is working</p>
-<a href="/dashboard" style="color:#00ff88">
-Dashboard
-</a>
+<a href="/dashboard" style="color:#0f8">Dashboard</a>
 </body>
 </html>
 `);
-
 });
 
 
-
-// داشبورد داخل خود سرور
 app.get("/dashboard",(req,res)=>{
-
-
 res.send(`
-
 <!DOCTYPE html>
-
-<html lang="fa">
-
+<html>
 <head>
-
 <meta charset="UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Dashboard</title>
-
-
 <script src="/socket.io/socket.io.js"></script>
-
-
 <style>
-
 body{
-
 background:#0b0e14;
-
 color:white;
-
 font-family:Arial;
-
-display:flex;
-
-justify-content:center;
-
-align-items:center;
-
-min-height:100vh;
-
-margin:0;
-
+padding:20px
 }
-
-
 .container{
-
-width:95%;
-
 max-width:1300px;
-
+margin:auto;
 background:#111b26;
-
 padding:20px;
-
-border-radius:20px;
-
+border-radius:20px
 }
-
-
-
 #browser-view{
-
 width:100%;
-
 background:black;
-
 border:2px solid #00ff88;
-
-border-radius:15px;
-
+border-radius:15px
 }
-
-
-.controls{
-
-margin-top:15px;
-
-display:flex;
-
-gap:10px;
-
-flex-wrap:wrap;
-
+button,input{
+padding:10px;
+margin:5px
 }
-
-
-input,button{
-
-padding:12px;
-
-border-radius:10px;
-
-border:0;
-
-}
-
-
-button{
-
-background:#00ff88;
-
-cursor:pointer;
-
-}
-
-
-#status{
-
-margin-top:15px;
-
-}
-
 </style>
-
-
 </head>
-
 
 <body>
 
-
 <div class="container">
-
 
 <img id="browser-view">
 
-
-<div class="controls">
+<br>
 
 <input id="urlInput" value="https://google.com">
 
+<button onclick="go()">Go</button>
 
-<button onclick="goToUrl()">
-برو
-</button>
+<button onclick="key('Enter')">Enter</button>
 
-
-<button onclick="sendKey('Enter')">
-Enter
-</button>
-
-
-<button onclick="scrollPage(-150)">
-↑
-</button>
-
-
-<button onclick="scrollPage(150)">
-↓
-</button>
-
+<div id="status">Connecting...</div>
 
 </div>
-
-
-<div id="status">
-در حال اتصال...
-</div>
-
-
-</div>
-
 
 
 <script>
 
+const socket=io();
 
-const socket = io();
-
-
-const img =
-document.getElementById("browser-view");
-
-
-const status =
-document.getElementById("status");
-
+const img=document.getElementById("browser-view");
+const status=document.getElementById("status");
 
 
 socket.on("connect",()=>{
-
-status.innerHTML="🟢 متصل";
-
+status.innerHTML="🟢 Connected";
 socket.emit("start-stream");
-
 });
 
 
-
-socket.on("live-frame",(data)=>{
-
-img.src =
-"data:image/jpeg;base64,"+data;
-
+socket.on("live-frame",d=>{
+img.src="data:image/jpeg;base64,"+d;
 });
 
 
-
-socket.on("error",(e)=>{
-
+socket.on("error",e=>{
 status.innerHTML="🔴 "+e;
-
 });
 
 
+img.onclick=e=>{
 
-img.onclick=(e)=>{
-
-const r =
-img.getBoundingClientRect();
-
+let r=img.getBoundingClientRect();
 
 socket.emit("command",{
-
 type:"click",
-
 x:(e.clientX-r.left)*1280/r.width,
-
 y:(e.clientY-r.top)*720/r.height
-
 });
-
 
 };
 
 
-
-document.addEventListener("keydown",(e)=>{
-
-socket.emit("command",{
-
-type:"keydown",
-
-text:e.key
-
-});
-
-});
-
-
-
-function goToUrl(){
-
-const url =
-document.getElementById("urlInput").value;
-
+function go(){
 
 socket.emit("command",{
-
 type:"goto",
-
-url:url
-
+url:document.getElementById("urlInput").value
 });
-
 
 }
 
 
-
-function sendKey(k){
+function key(k){
 
 socket.emit("command",{
-
 type:"keydown",
-
 text:k
-
 });
 
 }
-
-
-
-function scrollPage(v){
-
-socket.emit("command",{
-
-type:"scroll",
-
-text:v
-
-});
-
-}
-
 
 </script>
 
-
 </body>
-
 </html>
-
 `);
-
 });
 
 
-
-// فایل‌های public
 app.use(express.static(PUBLIC));
-
 
 
 let browser=null;
 let page=null;
 
 
-
 async function startBrowser(){
 
 if(!browser){
 
+console.log("⏳ Starting browser");
 
-console.log("⏳ Starting chromium");
 
-
-browser = await puppeteer.launch({
+browser=await puppeteer.launch({
 
 headless:"new",
 
-executablePath:"/usr/bin/chromium",
-
 args:[
-
 "--no-sandbox",
-
 "--disable-setuid-sandbox",
-
-"--disable-dev-shm-usage"
-
+"--disable-dev-shm-usage",
+"--disable-gpu"
 ],
 
 defaultViewport:{
-
 width:1280,
-
 height:720
-
 }
 
 });
 
 
-page = await browser.newPage();
+page=await browser.newPage();
 
 
-await page.goto("https://google.com");
+await page.goto(
+"https://google.com",
+{
+waitUntil:"networkidle2"
+}
+);
 
 
 console.log("✅ Browser ready");
 
-
 }
-
 
 return page;
 
@@ -423,49 +217,35 @@ return page;
 
 
 
+io.on("connection",socket=>{
 
-io.on("connection",(socket)=>{
-
-
-console.log("👤 User connected");
-
+console.log("👤 Connected");
 
 
 socket.on("start-stream",async()=>{
 
-
 try{
 
+const p=await startBrowser();
 
-const currentPage =
-await startBrowser();
-
-
-const session =
-await currentPage.target().createCDPSession();
-
+const session=
+await p.target().createCDPSession();
 
 
 await session.send(
 "Page.startScreencast",
 {
-
 format:"jpeg",
-
 quality:80,
-
 maxWidth:1280,
-
 maxHeight:720
-
-});
-
+}
+);
 
 
 session.on(
 "Page.screencastFrame",
-async(frame)=>{
-
+async frame=>{
 
 socket.emit(
 "live-frame",
@@ -476,32 +256,29 @@ frame.data
 await session.send(
 "Page.screencastFrameAck",
 {
-
 sessionId:frame.sessionId
+}
+);
 
 });
-
-
-});
-
 
 
 }catch(e){
 
-socket.emit("error",e.message);
+socket.emit(
+"error",
+e.message
+);
 
 }
-
 
 });
 
 
 
-socket.on("command",async(data)=>{
-
+socket.on("command",async data=>{
 
 try{
-
 
 if(!page)return;
 
@@ -525,26 +302,6 @@ data.text
 }
 
 
-else if(data.type==="goto"){
-
-
-let url=data.url;
-
-
-if(!url.startsWith("http")){
-
-url="https://"+url;
-
-}
-
-
-await page.goto(url);
-
-
-}
-
-
-
 else if(data.type==="keydown"){
 
 await page.keyboard.press(
@@ -554,12 +311,15 @@ data.text
 }
 
 
-else if(data.type==="scroll"){
+else if(data.type==="goto"){
 
-await page.evaluate(
-s=>window.scrollBy(0,s),
-data.text
-);
+let url=data.url;
+
+if(!url.startsWith("http"))
+url="https://"+url;
+
+
+await page.goto(url);
 
 }
 
@@ -570,7 +330,6 @@ socket.emit("error",e.message);
 
 }
 
-
 });
 
 
@@ -578,15 +337,12 @@ socket.emit("error",e.message);
 
 
 
-const PORT =
-process.env.PORT || 8080;
+const PORT=process.env.PORT||8080;
 
-
-server.listen(PORT,"0.0.0.0",()=>{
-
-console.log(
-"✅ Server running on",
-PORT
+server.listen(
+PORT,
+"0.0.0.0",
+()=>{
+console.log("✅ Server running",PORT);
+}
 );
-
-});
