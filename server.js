@@ -10,14 +10,14 @@ const { RTCVideoSource } = wrtc.nonstandard;
 const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: { origin: "*" }
+const io = new Server(server,{
+    cors:{origin:"*"}
 });
 
 app.use(express.json());
 
 
-app.get("/", (req,res)=>{
+app.get("/",(req,res)=>{
 res.send(`
 <html>
 <body style="background:#111;color:white;text-align:center">
@@ -27,6 +27,7 @@ res.send(`
 </html>
 `);
 });
+
 
 
 app.get("/dashboard",(req,res)=>{
@@ -63,13 +64,12 @@ border-radius:15px;
 
 </head>
 
+
 <body>
 
 <video id="screen" autoplay playsinline></video>
 
-<h3 id="status">
-Connecting...
-</h3>
+<h3 id="status">Connecting...</h3>
 
 
 <script>
@@ -83,6 +83,7 @@ const status=document.getElementById("status");
 let pc=null;
 
 let iceQueue=[];
+
 
 
 socket.on("connect",()=>{
@@ -101,17 +102,42 @@ socket.on("offer",async offer=>{
 pc=new RTCPeerConnection({
 
 iceServers:[
+
 {
 urls:"stun:stun.l.google.com:19302"
 }
+
 ]
 
 });
 
 
+
+pc.onconnectionstatechange=()=>{
+
+console.log(
+"STATE:",
+pc.connectionState
+);
+
+status.innerHTML=
+"WebRTC: "+pc.connectionState;
+
+};
+
+
+
 pc.ontrack=e=>{
 
+console.log(
+"TRACK RECEIVED",
+e.track.kind
+);
+
+
 video.srcObject=e.streams[0];
+
+video.play();
 
 };
 
@@ -119,9 +145,14 @@ video.srcObject=e.streams[0];
 
 pc.onicecandidate=e=>{
 
-if(e.candidate)
+if(e.candidate){
 
-socket.emit("ice",e.candidate);
+socket.emit(
+"ice",
+e.candidate
+);
+
+}
 
 };
 
@@ -141,13 +172,22 @@ iceQueue=[];
 
 
 
-let answer=await pc.createAnswer();
+let answer =
+await pc.createAnswer({
+
+offerToReceiveVideo:true
+
+});
 
 
 await pc.setLocalDescription(answer);
 
 
-socket.emit("answer",answer);
+
+socket.emit(
+"answer",
+answer
+);
 
 
 });
@@ -156,7 +196,9 @@ socket.emit("answer",answer);
 
 socket.on("ice",async c=>{
 
-if(!pc)return;
+
+if(!pc)
+return;
 
 
 if(pc.remoteDescription){
@@ -173,8 +215,8 @@ iceQueue.push(c);
 });
 
 
-
 </script>
+
 
 </body>
 
@@ -185,11 +227,14 @@ iceQueue.push(c);
 });
 
 
+
 let browser=null;
 let page=null;
 let source=null;
 let videoTrack=null;
-let captureStarted=false;async function startBrowser(){
+let captureStarted=false;
+
+async function startBrowser(){
 
 if(browser)
 return page;
@@ -243,17 +288,11 @@ await page.target().createCDPSession();
 await session.send(
 "Page.startScreencast",
 {
-
 format:"jpeg",
-
 quality:80,
-
 maxWidth:1280,
-
 maxHeight:720,
-
 everyNthFrame:1
-
 });
 
 
@@ -277,7 +316,6 @@ useTArray:true
 
 
 const width=decoded.width;
-
 const height=decoded.height;
 
 
@@ -286,26 +324,20 @@ new Uint8ClampedArray(decoded.data);
 
 
 
-const ySize =
-width*height;
-
-
-const uvSize =
-(width/2)*(height/2);
+const ySize=width*height;
+const uvSize=(width/2)*(height/2);
 
 
 
 const i420 =
 new Uint8Array(
-ySize + uvSize + uvSize
+ySize+uvSize+uvSize
 );
 
 
 
 let yIndex=0;
-
 let uIndex=ySize;
-
 let vIndex=ySize+uvSize;
 
 
@@ -315,15 +347,12 @@ for(let y=0;y<height;y++){
 for(let x=0;x<width;x++){
 
 
-const index =
-(y*width+x)*4;
+const i=(y*width+x)*4;
 
 
-const r=rgba[index];
-
-const g=rgba[index+1];
-
-const b=rgba[index+2];
+const r=rgba[i];
+const g=rgba[i+1];
+const b=rgba[i+2];
 
 
 
@@ -337,13 +366,11 @@ i420[yIndex++]=
 
 if(y%2===0 && x%2===0){
 
-
 i420[uIndex++]=
 -0.148*r-
 0.291*g+
 0.439*b+
 128;
-
 
 
 i420[vIndex++]=
@@ -352,9 +379,7 @@ i420[vIndex++]=
 0.071*b+
 128;
 
-
 }
-
 
 }
 
@@ -377,9 +402,7 @@ i420.length
 source.onFrame({
 
 width,
-
 height,
-
 data:i420
 
 });
@@ -408,11 +431,11 @@ sessionId:frame.sessionId
 );
 
 
-
 });
 
 
 }
+
 
 
 
@@ -450,9 +473,7 @@ peer=new wrtc.RTCPeerConnection({
 iceServers:[
 
 {
-
 urls:"stun:stun.l.google.com:19302"
-
 }
 
 ]
@@ -470,24 +491,54 @@ peer.addTrack(videoTrack);
 
 
 
+const sender =
+peer.getSenders()[0];
+
+
+if(sender){
+
+
+const params =
+sender.getParameters();
+
+
+if(params.encodings){
+
+params.encodings[0].maxBitrate =
+2000000;
+
+}
+
+
+await sender.setParameters(params);
+
+}
+
+
+
+
+
 peer.onicecandidate=e=>{
 
-
-if(e.candidate)
+if(e.candidate){
 
 socket.emit(
 "ice",
 e.candidate
 );
 
+}
 
 };
 
 
 
 const offer =
-await peer.createOffer();
+await peer.createOffer({
 
+offerToReceiveVideo:true
+
+});
 
 
 await peer.setLocalDescription(offer);
@@ -527,18 +578,33 @@ e.message
 
 socket.on("answer",async answer=>{
 
-
-if(peer)
+if(peer){
 
 await peer.setRemoteDescription(answer);
 
+}
+
+});
+
+
+
+socket.on("ice",async c=>{
+
+try{
+
+if(peer){
+
+await peer.addIceCandidate(c);
+
+}
+
+}catch(e){}
 
 });
 
 
 
 socket.on("disconnect",()=>{
-
 
 try{
 
@@ -547,9 +613,7 @@ peer.close();
 
 }catch(e){}
 
-
 });
-
 
 
 });
