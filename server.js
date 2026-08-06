@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const puppeteer = require("puppeteer");
-const wrtc = require("wrtc");
+const wrtc = require("@roamhq/wrtc");
 const jpeg = require("jpeg-js");
 
 const { RTCVideoSource } = wrtc.nonstandard;
@@ -14,19 +14,21 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
+
 app.use(express.json());
 
 
 app.get("/", (req,res)=>{
-res.send(`
-<html>
-<body style="background:#111;color:white;text-align:center">
-<h1>HELLO RAILWAY</h1>
-<a href="/dashboard">Dashboard</a>
-</body>
-</html>
-`);
+    res.send(`
+    <html>
+    <body style="background:#111;color:white;text-align:center">
+    <h1>HELLO RAILWAY</h1>
+    <a href="/dashboard">Dashboard</a>
+    </body>
+    </html>
+    `);
 });
+
 
 
 app.get("/dashboard",(req,res)=>{
@@ -50,13 +52,9 @@ font-family:Arial;
 padding:20px;
 }
 
-.container{
-max-width:1300px;
-margin:auto;
-}
-
 video{
 width:100%;
+max-width:1300px;
 background:black;
 border:2px solid #00ff88;
 border-radius:15px;
@@ -69,15 +67,11 @@ border-radius:15px;
 
 <body>
 
-<div class="container">
-
 <video id="screen" autoplay playsinline></video>
 
-<div id="status">
+<h3 id="status">
 Connecting...
-</div>
-
-</div>
+</h3>
 
 
 <script>
@@ -88,8 +82,8 @@ const video=document.getElementById("screen");
 
 const status=document.getElementById("status");
 
-
 let pc=null;
+
 
 
 socket.on("connect",()=>{
@@ -105,7 +99,18 @@ socket.emit("start-webrtc");
 socket.on("offer",async offer=>{
 
 
-pc=new RTCPeerConnection();
+pc=new RTCPeerConnection({
+
+iceServers:[
+
+{
+urls:"stun:stun.l.google.com:19302"
+}
+
+]
+
+});
+
 
 
 pc.ontrack=e=>{
@@ -113,6 +118,7 @@ pc.ontrack=e=>{
 video.srcObject=e.streams[0];
 
 };
+
 
 
 pc.onicecandidate=e=>{
@@ -131,7 +137,7 @@ e.candidate
 await pc.setRemoteDescription(offer);
 
 
-let answer=
+let answer =
 await pc.createAnswer();
 
 
@@ -144,7 +150,9 @@ answer
 );
 
 
+
 });
+
 
 
 
@@ -247,9 +255,12 @@ key:e.key
 
 
 
+
 let browser=null;
 let page=null;
 let source=null;
+let captureStarted=false;
+
 
 
 async function startBrowser(){
@@ -260,6 +271,7 @@ if(browser)
 return page;
 
 
+
 browser=await puppeteer.launch({
 
 headless:"new",
@@ -268,9 +280,12 @@ args:[
 
 "--no-sandbox",
 
-"--disable-setuid-sandbox"
+"--disable-setuid-sandbox",
+
+"--disable-dev-shm-usage"
 
 ],
+
 
 defaultViewport:{
 
@@ -279,7 +294,9 @@ height:720
 
 }
 
+
 });
+
 
 
 page=await browser.newPage();
@@ -288,6 +305,9 @@ page=await browser.newPage();
 await page.goto(
 "https://google.com"
 );
+
+
+console.log("Browser ready");
 
 
 return page;
@@ -307,7 +327,8 @@ async function startCapture(){
     format:"jpeg",
     quality:80,
     maxWidth:1280,
-    maxHeight:720
+    maxHeight:720,
+    everyNthFrame:1
     }
     );
     
@@ -328,7 +349,6 @@ async function startCapture(){
     );
     
     
-    
     const decoded =
     jpeg.decode(
     buffer,
@@ -339,18 +359,130 @@ async function startCapture(){
     
     
     
+    const rgba =
+    new Uint8ClampedArray(
+    decoded.data
+    );
+    
+    
+    const width =
+    decoded.width;
+    
+    const height =
+    decoded.height;
+    
+    
+    
+    const ySize =
+    width * height;
+    
+    
+    const uvSize =
+    (width/2) *
+    (height/2);
+    
+    
+    
+    const i420 =
+    new Uint8Array(
+    ySize + uvSize + uvSize
+    );
+    
+    
+    
+    let yIndex=0;
+    
+    let uIndex=ySize;
+    
+    let vIndex=ySize+uvSize;
+    
+    
+    
+    for(
+    let y=0;
+    y<height;
+    y++
+    ){
+    
+    
+    for(
+    let x=0;
+    x<width;
+    x++
+    ){
+    
+    
+    const index =
+    (y*width+x)*4;
+    
+    
+    const r=rgba[index];
+    
+    const g=rgba[index+1];
+    
+    const b=rgba[index+2];
+    
+    
+    
+    const Y =
+    0.257*r+
+    0.504*g+
+    0.098*b+
+    16;
+    
+    
+    
+    i420[yIndex++]=Y;
+    
+    
+    
+    if(
+    y%2===0 &&
+    x%2===0
+    ){
+    
+    
+    const U =
+    -0.148*r
+    -0.291*g
+    +0.439*b
+    +128;
+    
+    
+    
+    const V =
+    0.439*r
+    -0.368*g
+    -0.071*b
+    +128;
+    
+    
+    
+    i420[uIndex++]=U;
+    
+    i420[vIndex++]=V;
+    
+    
+    }
+    
+    
+    }
+    
+    
+    }
+    
+    
+    
     if(source){
     
     
     source.onFrame({
     
-    width:decoded.width,
+    width:width,
     
-    height:decoded.height,
+    height:height,
     
-    data:new Uint8ClampedArray(
-    decoded.data
-    )
+    data:i420
     
     });
     
@@ -358,11 +490,12 @@ async function startCapture(){
     }
     
     
+    
     }
     catch(e){
     
     console.log(
-    "frame error",
+    "frame error:",
     e.message
     );
     
@@ -378,6 +511,7 @@ async function startCapture(){
     );
     
     
+    
     });
     
     
@@ -385,12 +519,14 @@ async function startCapture(){
     
     
     
+    
     io.on("connection",socket=>{
     
     
     console.log(
-    "👤 user connected"
+    " user connected"
     );
+    
     
     
     let peer=null;
@@ -408,20 +544,23 @@ async function startCapture(){
     await startBrowser();
     
     
+    
     if(!source)
     
     source=new RTCVideoSource();
     
     
     
-    peer=
+    peer =
     new wrtc.RTCPeerConnection({
     
     iceServers:[
+    
     {
     urls:
     "stun:stun.l.google.com:19302"
     }
+    
     ]
     
     });
@@ -432,13 +571,13 @@ async function startCapture(){
     source.createTrack();
     
     
-    peer.addTrack(
-    track
-    );
+    
+    peer.addTrack(track);
     
     
     
     peer.onicecandidate=e=>{
+    
     
     if(e.candidate)
     
@@ -447,12 +586,15 @@ async function startCapture(){
     e.candidate
     );
     
+    
     };
     
     
     
-    let offer =
+    
+    const offer =
     await peer.createOffer();
+    
     
     
     await peer.setLocalDescription(
@@ -468,13 +610,15 @@ async function startCapture(){
     
     
     
-    if(!page._captureStarted){
     
-    page._captureStarted=true;
+    if(!captureStarted){
+    
+    captureStarted=true;
     
     await startCapture();
     
     }
+    
     
     
     
@@ -513,9 +657,10 @@ async function startCapture(){
     
     
     
+    
     socket.on(
     "ice",
-    async c=>{
+    async candidate=>{
     
     
     try{
@@ -524,7 +669,7 @@ async function startCapture(){
     if(peer)
     
     await peer.addIceCandidate(
-    c
+    candidate
     );
     
     
@@ -540,15 +685,14 @@ async function startCapture(){
     
     
     
+    
     socket.on(
     "mouse",
     async d=>{
     
     
     if(!page)
-    
     return;
-    
     
     
     try{
@@ -564,6 +708,7 @@ async function startCapture(){
     
     
     }
+    
     
     
     else if(d.type==="down"){
@@ -608,8 +753,8 @@ async function startCapture(){
     catch(e){}
     
     
-    });
     
+    });
     
     
     
@@ -622,9 +767,7 @@ async function startCapture(){
     
     
     if(!page)
-    
     return;
-    
     
     
     try{
@@ -644,15 +787,11 @@ async function startCapture(){
     );
     
     
-    
     }
     catch(e){}
     
     
-    
     });
-    
-    
     
     
     
@@ -663,17 +802,14 @@ async function startCapture(){
     
     try{
     
-    
     if(peer)
     
     peer.close();
-    
     
     }
     catch(e){}
     
     
-    
     });
     
     
@@ -682,7 +818,8 @@ async function startCapture(){
     
     
     
-    const PORT=
+    
+    const PORT =
     process.env.PORT || 8080;
     
     
@@ -692,7 +829,7 @@ async function startCapture(){
     ()=>{
     
     console.log(
-    "🔥 WebRTC server running",
+    " WebRTC server running",
     PORT
     );
     
