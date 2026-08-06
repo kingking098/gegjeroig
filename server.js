@@ -446,16 +446,17 @@ sessionId:frame.sessionId
 
 }catch(e){
 
-console.error(" startCapture error:", e);
+console.error("❌ startCapture error:", e);
 
 }
 
 }
+
 
 io.on("connection",socket=>{
 
 
-console.log(" user connected");
+console.log("👤 user connected");
 
 
 let peer=null;
@@ -503,29 +504,32 @@ peer.addTrack(videoTrack);
 
 
 
+try{
+
 const sender =
 peer.getSenders()[0];
 
 
 if(sender){
 
-
 const params =
 sender.getParameters();
 
 
-if(!params.encodings || params.encodings.length===0){
-
-params.encodings=[{}];
-
-}
-
+if(params.encodings && params.encodings.length>0){
 
 params.encodings[0].maxBitrate =
 2000000;
 
-
 await sender.setParameters(params);
+
+}
+
+}
+
+}catch(e){
+
+console.log("bitrate setting skipped:", e.message);
 
 }
 
@@ -579,7 +583,7 @@ await startCapture();
 
 }catch(e){
 
-console.error(" start-webrtc error:", e);
+console.error("❌ start-webrtc error:", e);
 
 socket.emit(
 "error",
@@ -623,7 +627,7 @@ await peer.addIceCandidate(c);
 
 socket.on("disconnect",()=>{
 
-console.log(" user disconnected");
+console.log("👋 user disconnected");
 
 try{
 
@@ -646,7 +650,7 @@ process.env.PORT || 8080;
 server.listen(PORT,"0.0.0.0",()=>{
 
 console.log(
-" WebRTC server running",
+"🔥 WebRTC server running",
 PORT
 );
 
