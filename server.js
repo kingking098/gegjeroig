@@ -1,20 +1,23 @@
-const express=require("express");
-const http=require("http");
-const {Server}=require("socket.io");
-const puppeteer=require("puppeteer");
-const path=require("path");
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const puppeteer = require("puppeteer");
+const wrtc = require("wrtc");
+const jpeg = require("jpeg-js");
 
-const app=express();
-const server=http.createServer(app);
+const { RTCVideoSource } = wrtc.nonstandard;
 
-const io=new Server(server,{
- cors:{origin:"*"}
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: { origin: "*" }
 });
 
 app.use(express.json());
 
 
-app.get("/",(req,res)=>{
+app.get("/", (req,res)=>{
 res.send(`
 <html>
 <body style="background:#111;color:white;text-align:center">
@@ -27,8 +30,8 @@ res.send(`
 
 
 app.get("/dashboard",(req,res)=>{
-res.send(`
 
+res.send(`
 <!DOCTYPE html>
 <html>
 
@@ -44,7 +47,6 @@ body{
 background:#0b0e14;
 color:white;
 font-family:Arial;
-margin:0;
 padding:20px;
 }
 
@@ -53,16 +55,11 @@ max-width:1300px;
 margin:auto;
 }
 
-img{
+video{
 width:100%;
 background:black;
 border:2px solid #00ff88;
-cursor:crosshair;
-}
-
-input,button{
-padding:10px;
-margin-top:10px;
+border-radius:15px;
 }
 
 </style>
@@ -74,13 +71,7 @@ margin-top:10px;
 
 <div class="container">
 
-<img id="screen">
-
-<br>
-
-<input id="url" value="https://google.com">
-
-<button onclick="go()">GO</button>
+<video id="screen" autoplay playsinline></video>
 
 <div id="status">
 Connecting...
@@ -89,86 +80,110 @@ Connecting...
 </div>
 
 
-
 <script>
 
 const socket=io();
 
-const img=document.getElementById("screen");
+const video=document.getElementById("screen");
+
 const status=document.getElementById("status");
+
+
+let pc=null;
 
 
 socket.on("connect",()=>{
 
-status.innerHTML="🟢 Connected";
+status.innerHTML="Connected";
 
-socket.emit("start-stream");
-
-});
-
-
-socket.on("live-frame",data=>{
-
-img.src="data:image/jpeg;base64,"+data;
+socket.emit("start-webrtc");
 
 });
 
 
-function pos(e){
 
-let r=img.getBoundingClientRect();
+socket.on("offer",async offer=>{
 
-return {
 
-x:(e.clientX-r.left)*1280/r.width,
+pc=new RTCPeerConnection();
 
-y:(e.clientY-r.top)*720/r.height
+
+pc.ontrack=e=>{
+
+video.srcObject=e.streams[0];
 
 };
 
-}
+
+pc.onicecandidate=e=>{
+
+if(e.candidate)
+
+socket.emit(
+"ice",
+e.candidate
+);
+
+};
 
 
 
-img.onmousemove=e=>{
+await pc.setRemoteDescription(offer);
 
-let p=pos(e);
+
+let answer=
+await pc.createAnswer();
+
+
+await pc.setLocalDescription(answer);
+
+
+socket.emit(
+"answer",
+answer
+);
+
+
+});
+
+
+
+socket.on("ice",async c=>{
+
+if(pc)
+
+await pc.addIceCandidate(c);
+
+});
+
+
+
+
+video.onmousemove=e=>{
+
+let r=video.getBoundingClientRect();
+
 
 socket.emit("mouse",{
 
 type:"move",
 
-...p
+x:(e.clientX-r.left)*1280/r.width,
+
+y:(e.clientY-r.top)*720/r.height
 
 });
+
 
 };
 
 
 
-img.onmousedown=e=>{
-
-let p=pos(e);
+video.onmousedown=e=>{
 
 socket.emit("mouse",{
 
 type:"down",
-
-button:e.button,
-
-...p
-
-});
-
-};
-
-
-
-img.onmouseup=e=>{
-
-socket.emit("mouse",{
-
-type:"up",
 
 button:e.button
 
@@ -178,11 +193,13 @@ button:e.button
 
 
 
-img.onwheel=e=>{
+video.onmouseup=e=>{
 
-socket.emit("wheel",{
+socket.emit("mouse",{
 
-delta:e.deltaY
+type:"up",
+
+button:e.button
 
 });
 
@@ -218,39 +235,29 @@ key:e.key
 
 
 
-function go(){
-
-socket.emit("command",{
-
-type:"goto",
-
-url:document.getElementById("url").value
-
-});
-
-}
-
-
 </script>
 
 
 </body>
-</html>
 
+</html>
 `);
+
 });
 
 
 
 let browser=null;
 let page=null;
+let source=null;
 
 
 async function startBrowser(){
 
-if(!browser){
 
-console.log("Starting browser");
+if(browser)
+
+return page;
 
 
 browser=await puppeteer.launch({
@@ -261,11 +268,16 @@ args:[
 
 "--no-sandbox",
 
-"--disable-setuid-sandbox",
+"--disable-setuid-sandbox"
 
-"--disable-dev-shm-usage"
+],
 
-]
+defaultViewport:{
+
+width:1280,
+height:720
+
+}
 
 });
 
@@ -273,201 +285,415 @@ args:[
 page=await browser.newPage();
 
 
-await page.setViewport({
+await page.goto(
+"https://google.com"
+);
 
-width:1280,
-height:720
-
-});
-
-
-await page.goto("https://google.com");
-
-
-console.log("Browser ready");
-
-}
 
 return page;
 
 }
 
 
-
-io.on("connection",socket=>{
-
-
-socket.on("start-stream",async()=>{
-
-
-try{
-
-
-let p=await startBrowser();
-
-
-let session=
-await p.target().createCDPSession();
-
-
-
-await session.send(
-"Page.startScreencast",
-{
-
-format:"jpeg",
-
-quality:80,
-
-maxWidth:1280,
-
-maxHeight:720
-
-}
-);
-
-
-
-session.on(
-"Page.screencastFrame",
-async frame=>{
-
-
-socket.emit(
-"live-frame",
-frame.data
-);
-
-
-await session.send(
-"Page.screencastFrameAck",
-{
-sessionId:frame.sessionId
-}
-);
-
-
-});
-
-
-}catch(e){
-
-socket.emit("error",e.message);
-
-}
-
-
-});
-
-
-
-socket.on("mouse",async d=>{
-
-if(!page)return;
-
-
-if(d.type==="move"){
-
-await page.mouse.move(
-d.x,
-d.y
-);
-
-}
-
-
-if(d.type==="down"){
-
-await page.mouse.down({
-
-button:d.button===2?"right":"left"
-
-});
-
-}
-
-
-if(d.type==="up"){
-
-await page.mouse.up({
-
-button:d.button===2?"right":"left"
-
-});
-
-}
-
-
-});
-
-
-
-socket.on("wheel",async d=>{
-
-if(page){
-
-await page.mouse.wheel({
-
-deltaY:d.delta
-
-});
-
-}
-
-});
-
-
-
-socket.on("key",async d=>{
-
-if(!page)return;
-
-
-if(d.type==="down")
-
-await page.keyboard.down(d.key);
-
-
-else
-
-await page.keyboard.up(d.key);
-
-
-});
-
-
-
-socket.on("command",async d=>{
-
-if(!page)return;
-
-
-if(d.type==="goto"){
-
-let u=d.url;
-
-if(!u.startsWith("http"))
-
-u="https://"+u;
-
-
-await page.goto(u);
-
-}
-
-
-});
-
-
-});
-
-
-
-const PORT=process.env.PORT||8080;
-
-
-server.listen(PORT,"0.0.0.0",()=>{
-
-console.log("SERVER RUNNING",PORT);
-
-});
+async function startCapture(){
+
+    const session =
+    await page.target().createCDPSession();
+    
+    
+    await session.send(
+    "Page.startScreencast",
+    {
+    format:"jpeg",
+    quality:80,
+    maxWidth:1280,
+    maxHeight:720
+    }
+    );
+    
+    
+    
+    session.on(
+    "Page.screencastFrame",
+    async frame=>{
+    
+    
+    try{
+    
+    
+    const buffer =
+    Buffer.from(
+    frame.data,
+    "base64"
+    );
+    
+    
+    
+    const decoded =
+    jpeg.decode(
+    buffer,
+    {
+    useTArray:true
+    }
+    );
+    
+    
+    
+    if(source){
+    
+    
+    source.onFrame({
+    
+    width:decoded.width,
+    
+    height:decoded.height,
+    
+    data:new Uint8ClampedArray(
+    decoded.data
+    )
+    
+    });
+    
+    
+    }
+    
+    
+    }
+    catch(e){
+    
+    console.log(
+    "frame error",
+    e.message
+    );
+    
+    }
+    
+    
+    
+    await session.send(
+    "Page.screencastFrameAck",
+    {
+    sessionId:frame.sessionId
+    }
+    );
+    
+    
+    });
+    
+    
+    }
+    
+    
+    
+    io.on("connection",socket=>{
+    
+    
+    console.log(
+    "👤 user connected"
+    );
+    
+    
+    let peer=null;
+    
+    
+    
+    socket.on(
+    "start-webrtc",
+    async()=>{
+    
+    
+    try{
+    
+    
+    await startBrowser();
+    
+    
+    if(!source)
+    
+    source=new RTCVideoSource();
+    
+    
+    
+    peer=
+    new wrtc.RTCPeerConnection({
+    
+    iceServers:[
+    {
+    urls:
+    "stun:stun.l.google.com:19302"
+    }
+    ]
+    
+    });
+    
+    
+    
+    const track =
+    source.createTrack();
+    
+    
+    peer.addTrack(
+    track
+    );
+    
+    
+    
+    peer.onicecandidate=e=>{
+    
+    if(e.candidate)
+    
+    socket.emit(
+    "ice",
+    e.candidate
+    );
+    
+    };
+    
+    
+    
+    let offer =
+    await peer.createOffer();
+    
+    
+    await peer.setLocalDescription(
+    offer
+    );
+    
+    
+    
+    socket.emit(
+    "offer",
+    offer
+    );
+    
+    
+    
+    if(!page._captureStarted){
+    
+    page._captureStarted=true;
+    
+    await startCapture();
+    
+    }
+    
+    
+    
+    }
+    catch(e){
+    
+    socket.emit(
+    "error",
+    e.message
+    );
+    
+    }
+    
+    
+    
+    });
+    
+    
+    
+    
+    
+    socket.on(
+    "answer",
+    async answer=>{
+    
+    
+    if(peer)
+    
+    await peer.setRemoteDescription(
+    answer
+    );
+    
+    
+    });
+    
+    
+    
+    
+    socket.on(
+    "ice",
+    async c=>{
+    
+    
+    try{
+    
+    
+    if(peer)
+    
+    await peer.addIceCandidate(
+    c
+    );
+    
+    
+    }
+    catch(e){}
+    
+    
+    
+    });
+    
+    
+    
+    
+    
+    
+    socket.on(
+    "mouse",
+    async d=>{
+    
+    
+    if(!page)
+    
+    return;
+    
+    
+    
+    try{
+    
+    
+    if(d.type==="move"){
+    
+    
+    await page.mouse.move(
+    d.x,
+    d.y
+    );
+    
+    
+    }
+    
+    
+    else if(d.type==="down"){
+    
+    
+    await page.mouse.down({
+    
+    button:
+    d.button===2
+    ?
+    "right"
+    :
+    "left"
+    
+    });
+    
+    
+    }
+    
+    
+    
+    else if(d.type==="up"){
+    
+    
+    await page.mouse.up({
+    
+    button:
+    d.button===2
+    ?
+    "right"
+    :
+    "left"
+    
+    });
+    
+    
+    }
+    
+    
+    
+    }
+    catch(e){}
+    
+    
+    });
+    
+    
+    
+    
+    
+    
+    
+    socket.on(
+    "key",
+    async d=>{
+    
+    
+    if(!page)
+    
+    return;
+    
+    
+    
+    try{
+    
+    
+    if(d.type==="down")
+    
+    await page.keyboard.down(
+    d.key
+    );
+    
+    
+    else
+    
+    await page.keyboard.up(
+    d.key
+    );
+    
+    
+    
+    }
+    catch(e){}
+    
+    
+    
+    });
+    
+    
+    
+    
+    
+    socket.on(
+    "disconnect",
+    ()=>{
+    
+    
+    try{
+    
+    
+    if(peer)
+    
+    peer.close();
+    
+    
+    }
+    catch(e){}
+    
+    
+    
+    });
+    
+    
+    });
+    
+    
+    
+    
+    const PORT=
+    process.env.PORT || 8080;
+    
+    
+    server.listen(
+    PORT,
+    "0.0.0.0",
+    ()=>{
+    
+    console.log(
+    "🔥 WebRTC server running",
+    PORT
+    );
+    
+    });
