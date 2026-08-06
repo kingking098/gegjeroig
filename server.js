@@ -18,11 +18,13 @@ const PUBLIC = path.join(__dirname, "public");
 console.log("🔥 SERVER STARTED");
 console.log("DIR:", __dirname);
 console.log("PUBLIC:", PUBLIC);
+
 console.log("public:", fs.existsSync(PUBLIC));
 console.log("index:", fs.existsSync(path.join(PUBLIC, "index.html")));
 console.log("dashboard:", fs.existsSync(path.join(PUBLIC, "dashboard.html")));
 
 app.use(express.json());
+
 
 app.get("/check", (req, res) => {
   res.json({
@@ -32,69 +34,63 @@ app.get("/check", (req, res) => {
   });
 });
 
+
+// صفحه تست
 app.get("/", (req, res) => {
-  res.type("html");
   res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8" />
-      <title>Railway Test</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 40px;
-          background: #f5f5f5;
-          color: #111;
-        }
-        .box {
-          background: white;
-          padding: 24px;
-          border-radius: 12px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-          max-width: 700px;
-        }
-        a {
-          display: inline-block;
-          margin-top: 12px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="box">
-        <h1>HELLO RAILWAY</h1>
-        <p>Server is working</p>
-        <a href="/dashboard">Dashboard</a>
-      </div>
-    </body>
-    </html>
+  <!DOCTYPE html>
+  <html>
+  <body>
+    <h1>HELLO RAILWAY</h1>
+    <p>Server is working</p>
+    <a href="/dashboard">Dashboard</a>
+  </body>
+  </html>
   `);
 });
 
+
+// داشبورد تستی
 app.get("/dashboard", (req, res) => {
-  const file = path.join(PUBLIC, "dashboard.html");
-  if (fs.existsSync(file)) {
-    return res.sendFile(file);
-  }
-  return res.status(500).send("dashboard.html not found");
+  res.send(`
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Dashboard</title>
+  </head>
+  <body>
+    <h1>DASHBOARD OK</h1>
+    <p>Dashboard route is working</p>
+  </body>
+  </html>
+  `);
 });
+
 
 app.get("/dashboard.html", (req, res) => {
-  const file = path.join(PUBLIC, "dashboard.html");
-  if (fs.existsSync(file)) {
-    return res.sendFile(file);
-  }
-  return res.status(500).send("dashboard.html not found");
+  res.send(`
+  <!DOCTYPE html>
+  <html>
+  <body>
+    <h1>DASHBOARD HTML OK</h1>
+  </body>
+  </html>
+  `);
 });
 
-// بعد از روت‌های اصلی، فایل‌های public را هم سرو کن
+
+// فایل‌های public
 app.use(express.static(PUBLIC));
+
 
 let browser = null;
 let page = null;
 
+
 async function startBrowser() {
+
   if (!browser) {
+
     console.log("⏳ Starting chromium...");
 
     browser = await puppeteer.launch({
@@ -104,94 +100,179 @@ async function startBrowser() {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-gpu",
+        "--disable-gpu"
       ],
-      defaultViewport: { width: 1280, height: 720 },
+      defaultViewport:{
+        width:1280,
+        height:720
+      }
     });
 
+
     page = await browser.newPage();
+
     await page.goto("https://google.com");
+
     console.log("✅ Browser ready");
   }
 
   return page;
 }
 
-app.post("/login", (req, res) => {
-  const { username, password } = req.body || {};
 
-  if (username && password) {
-    return res.json({
-      success: true,
-      redirect: "/dashboard",
+
+app.post("/login",(req,res)=>{
+
+  const {username,password}=req.body || {};
+
+  if(username && password){
+
+    res.json({
+      success:true,
+      redirect:"/dashboard"
     });
+
+  }else{
+
+    res.status(401).json({
+      success:false
+    });
+
   }
 
-  return res.status(401).json({ success: false });
 });
 
-io.on("connection", (socket) => {
+
+
+
+io.on("connection",(socket)=>{
+
   console.log("👤 User connected");
 
-  socket.on("start-stream", async () => {
-    try {
+
+  socket.on("start-stream",async()=>{
+
+    try{
+
       const currentPage = await startBrowser();
-      const session = await currentPage.target().createCDPSession();
 
-      await session.send("Page.startScreencast", {
-        format: "jpeg",
-        quality: 80,
-        maxWidth: 1280,
-        maxHeight: 720,
-        everyNthFrame: 1,
-      });
+      const session =
+      await currentPage.target().createCDPSession();
 
-      session.on("Page.screencastFrame", async (frame) => {
-        socket.emit("live-frame", frame.data);
-        await session.send("Page.screencastFrameAck", {
-          sessionId: frame.sessionId,
-        });
-      });
 
-      socket.on("disconnect", () => {
-        session.detach().catch(() => {});
-      });
-    } catch (err) {
-      socket.emit("error", err.message);
-    }
-  });
-
-  socket.on("command", async (data) => {
-    try {
-      if (!page) return;
-
-      const { type, x, y, text, url } = data || {};
-
-      if (type === "click") {
-        await page.mouse.click(Number(x), Number(y));
-      } else if (type === "type") {
-        await page.keyboard.type(String(text || ""));
-      } else if (type === "goto") {
-        if (url && String(url).trim()) {
-          let finalUrl = String(url).trim();
-          if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-            finalUrl = "https://" + finalUrl;
-          }
-          await page.goto(finalUrl, { waitUntil: "networkidle0" });
+      await session.send(
+        "Page.startScreencast",
+        {
+          format:"jpeg",
+          quality:80,
+          maxWidth:1280,
+          maxHeight:720,
+          everyNthFrame:1
         }
-      } else if (type === "keydown") {
-        await page.keyboard.press(String(text || ""));
-      } else if (type === "scroll") {
-        await page.evaluate((s) => window.scrollBy(0, s), Number(text || 0));
-      }
-    } catch (err) {
-      socket.emit("error", err.message);
+      );
+
+
+      session.on(
+        "Page.screencastFrame",
+        async(frame)=>{
+
+          socket.emit(
+            "live-frame",
+            frame.data
+          );
+
+
+          await session.send(
+            "Page.screencastFrameAck",
+            {
+              sessionId:frame.sessionId
+            }
+          );
+
+        }
+      );
+
+
+    }catch(err){
+
+      socket.emit(
+        "error",
+        err.message
+      );
+
     }
+
   });
+
+
+
+  socket.on("command",async(data)=>{
+
+    try{
+
+      if(!page)return;
+
+      const {type,x,y,text,url}=data;
+
+
+      if(type==="click"){
+
+        await page.mouse.click(
+          Number(x),
+          Number(y)
+        );
+
+      }
+
+      else if(type==="type"){
+
+        await page.keyboard.type(
+          String(text || "")
+        );
+
+      }
+
+      else if(type==="goto"){
+
+        let finalUrl=String(url);
+
+        if(
+          !finalUrl.startsWith("http")
+        ){
+
+          finalUrl="https://"+finalUrl;
+
+        }
+
+        await page.goto(finalUrl);
+
+      }
+
+    }catch(err){
+
+      socket.emit(
+        "error",
+        err.message
+      );
+
+    }
+
+  });
+
 });
+
+
 
 const PORT = process.env.PORT || 8080;
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on ${PORT}`);
-});
+
+server.listen(
+  PORT,
+  "0.0.0.0",
+  ()=>{
+    console.log(
+      "✅ Server running on",
+      PORT
+    );
+  }
+);
