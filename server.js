@@ -17,6 +17,39 @@ const io = new Server(server,{
 app.use(express.json());
 
 
+const ICE_SERVERS = [
+
+{
+urls:"stun:stun.relay.metered.ca:80"
+},
+
+{
+urls:"turn:global.relay.metered.ca:80",
+username:"22195bc9156d59e4f7d47d36",
+credential:"mfcp61zz149eOIV8"
+},
+
+{
+urls:"turn:global.relay.metered.ca:80?transport=tcp",
+username:"22195bc9156d59e4f7d47d36",
+credential:"mfcp61zz149eOIV8"
+},
+
+{
+urls:"turn:global.relay.metered.ca:443",
+username:"22195bc9156d59e4f7d47d36",
+credential:"mfcp61zz149eOIV8"
+},
+
+{
+urls:"turns:global.relay.metered.ca:443?transport=tcp",
+username:"22195bc9156d59e4f7d47d36",
+credential:"mfcp61zz149eOIV8"
+}
+
+];
+
+
 app.get("/",(req,res)=>{
 res.send(`
 <html>
@@ -85,6 +118,8 @@ let pc=null;
 let iceQueue=[];
 
 
+const ICE_SERVERS = ${JSON.stringify(ICE_SERVERS)};
+
 
 socket.on("connect",()=>{
 
@@ -110,13 +145,9 @@ socket.on("offer",async offer=>{
 
 pc=new RTCPeerConnection({
 
-iceServers:[
+iceServers: ICE_SERVERS,
 
-{
-urls:"stun:stun.l.google.com:19302"
-}
-
-]
+iceTransportPolicy: "relay"
 
 });
 
@@ -457,6 +488,7 @@ console.error("❌ startCapture error:", e);
 }
 
 
+
 io.on("connection",socket=>{
 
 
@@ -487,13 +519,9 @@ source=new RTCVideoSource();
 
 peer=new wrtc.RTCPeerConnection({
 
-iceServers:[
+iceServers: ICE_SERVERS,
 
-{
-urls:"stun:stun.l.google.com:19302"
-}
-
-]
+iceTransportPolicy: "relay"
 
 });
 
